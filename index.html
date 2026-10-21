@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Albireo 展會媒合平台</title>
+<meta name="description" content="Albireo 展會媒合平台 landing page 三種視覺方向：星系版、產品版、混合版。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=Michroma&family=Martian+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+/* Layout: a quiet chooser. Brand mark + one line, then three preview cards in a row; each card is the whole link. Gold/blue = Albireo's two stars. */
+:root{
+  --bg:#F4F5F9; --card:#FFFFFF; --ink:#141833; --dim:#585E7C; --line:rgba(47,62,140,.14);
+  --gold:#A86C0A; --blue:#2F5FD0;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-display:"Noto Serif TC","Songti TC",serif;
+  --f-mark:"Michroma","Noto Sans TC",sans-serif;
+  --f-mono:"Martian Mono",ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(20,24,51,.06),0 18px 40px -18px rgba(20,24,51,.25);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#070A1E; --card:#10142C; --ink:#ECEFFA; --dim:#9AA2C6; --line:rgba(160,180,255,.15);
+  --gold:#F4B85C; --blue:#8DB9FF; --shadow:0 1px 2px rgba(0,0,0,.4),0 18px 44px -18px rgba(0,0,0,.8); color-scheme:dark}}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);line-height:1.75;-webkit-font-smoothing:antialiased;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.wrap{max-width:1180px;margin:0 auto;padding-block:clamp(2.5rem,7vw,5rem)}
+header{display:grid;gap:1rem;margin-bottom:clamp(2rem,5vw,3.5rem)}
+.brand{display:flex;align-items:center;gap:.75rem}
+.brand svg{width:36px;height:36px}
+.brand b{font-family:var(--f-mark);font-weight:400;letter-spacing:.22em;font-size:1.05rem}
+h1{font-family:var(--f-display);font-size:clamp(1.9rem,4.4vw,3rem);line-height:1.25;margin:0;text-wrap:balance}
+header p{margin:0;color:var(--dim);max-width:36em}
+.grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.4rem}
+.card{display:grid;grid-template-rows:auto 1fr;height:100%;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);transition:transform .25s,border-color .25s}
+.card:hover{transform:translateY(-3px);border-color:var(--gold)}
+.card:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.shot{aspect-ratio:16/10;overflow:hidden;border-bottom:1px solid var(--line);max-width:100%}
+.shot img{display:block;width:100%;height:100%;object-fit:cover;object-position:top;transition:transform .5s}
+.card:hover .shot img{transform:scale(1.03)}
+.meta{display:grid;gap:.45rem;align-content:start;padding:1.1rem 1.25rem 1.35rem}
+.tag{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+.meta h2{margin:0;font-size:1.25rem}
+.meta p{margin:0;color:var(--dim);font-size:.93rem;line-height:1.65}
+.go{margin-top:.4rem;font-size:.9rem;font-weight:700;color:var(--blue)}
+footer{margin-top:clamp(2.5rem,6vw,4rem);padding-top:1.4rem;border-top:1px solid var(--line);color:var(--dim);font-size:.85rem}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.card,.shot img{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13.5" fill="none" stroke="var(--line)"/><circle cx="10.5" cy="15" r="4.2" fill="var(--gold)"/><circle cx="20.5" cy="15" r="2.8" fill="var(--blue)"/></svg>
+      <b>ALBIREO</b>
+    </div>
+    <h1>讓該見面的人，在展會上相遇。</h1>
+    <p>Albireo 展會媒合平台的產品介紹頁，提供三種視覺方向，內容相同。點選任一版本開啟。</p>
+  </header>
+  <ul class="grid">
+    <li><a class="card" href="albireo_galaxy.html">
+      <div class="shot"><img src="media/preview_galaxy.jpg" alt="星系版首頁預覽：深色星空與金藍雙星" width="1200" height="750"></div>
+      <div class="meta"><span class="tag">Version A</span><h2>星系版</h2><p>深色星空背景，隨捲動在星系間飛行，文字以儀表讀數呈現。適合品牌發表與簡報開場。</p><span class="go">開啟星系版 →</span></div>
+    </a></li>
+    <li><a class="card" href="albireo_product.html">
+      <div class="shot"><img src="media/preview_product.jpg" alt="產品版首頁預覽：亮色版面與產品截圖" width="1200" height="750"></div>
+      <div class="meta"><span class="tag">Version B</span><h2>產品版</h2><p>以產品藍為主色的軟體官網版面，實際畫面為主，支援亮色與暗色。適合業務說明與客戶瀏覽。</p><span class="go">開啟產品版 →</span></div>
+    </a></li>
+    <li><a class="card" href="albireo_hybrid.html">
+      <div class="shot"><img src="media/preview_hybrid.jpg" alt="混合版首頁預覽：星空開場與導覽索引" width="1200" height="750"></div>
+      <div class="meta"><span class="tag">Version C</span><h2>混合版</h2><p>星空開場，接著依七個步驟排列的功能導覽，左側索引跟著捲動。兼顧氛圍與易讀。</p><span class="go">開啟混合版 →</span></div>
+    </a></li>
+  </ul>
+  <footer>Albireo 展會媒合平台　由 Riversoft 打造</footer>
+</div>
+</body>
+</html>
