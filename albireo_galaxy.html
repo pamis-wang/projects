@@ -1,0 +1,636 @@
+<title>Albireo 星圖</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=Martian+Mono:wght@300;400;500&family=Michroma&display=swap" rel="stylesheet">
+<style>
+/* Layout: a star chart. A fixed three.js galaxy sits behind everything; the camera drifts along a scripted orbit as you scroll. Copy reads as instrument readouts with HUD corner brackets; product screens are "observation plates". Dark only, by design: Albireo A gold (甲組) and B blue (乙組). */
+:root{
+  --bg:#04071A; --bg-2:#10142F; --ink:#ECEFFA; --dim:#9AA2C6; --faint:rgba(206,216,255,.16); --panel:rgba(6,9,30,.78);
+  --gold:#F4B85C; --blue:#8DB9FF; --dust:#8C92C8; --hi:#7EE0B0;
+  --f-display:"Noto Serif TC","Songti TC",serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-hud:"Martian Mono","Noto Sans TC",ui-monospace,monospace;
+  --f-mark:"Michroma","Noto Sans TC",sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;color:var(--ink);background:radial-gradient(90% 70% at 50% 40%,var(--bg-2),var(--bg) 70%) fixed,var(--bg);font-family:var(--f-body);font-size:1.0625rem;line-height:1.8;-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+h1,h2,h3{text-wrap:balance;margin:0}
+p{margin:0}
+a{color:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+img{display:block;max-width:100%;height:auto}
+.num{font-family:var(--f-hud);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:3px}
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+main,footer{position:relative;z-index:2}
+
+/* HUD */
+.hud{position:fixed;z-index:4}
+.tl{top:calc(env(safe-area-inset-top,0px) + 18px);left:max(16px,env(safe-area-inset-left,0px))}
+.tr{top:calc(env(safe-area-inset-top,0px) + 18px);right:max(16px,env(safe-area-inset-right,0px))}
+.bl{bottom:calc(env(safe-area-inset-bottom,0px) + 18px);left:max(16px,env(safe-area-inset-left,0px));font-size:.72rem;color:var(--dim);line-height:1.5;pointer-events:none}
+.bl .val{font-size:.95rem;color:var(--ink)}
+.brand{display:flex;align-items:center;gap:.7rem;text-decoration:none}
+.brand svg{width:30px;height:30px}
+.brand b{font-family:var(--f-mark);font-weight:400;font-size:.95rem;letter-spacing:.22em;display:block;line-height:1.2}
+.brand span{display:block;font-size:.76rem;color:var(--dim);line-height:1.3}
+.btn{border:1px solid var(--ink);border-radius:999px;padding:.5rem 1.2rem;min-height:42px;display:inline-flex;align-items:center;gap:.5rem;text-decoration:none;font-size:.94rem;background:var(--ink);color:var(--bg)}
+.btn:hover{background:var(--gold);border-color:var(--gold)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--faint)}
+.btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
+@media (max-width:700px){.bl{display:none}}
+
+/* shared type */
+.lbl{display:flex;flex-wrap:wrap;gap:.3rem .9rem;align-items:baseline;font-family:var(--f-hud);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem}
+.lbl span{color:var(--dim);letter-spacing:.04em;font-family:var(--f-body);font-size:.82rem;text-transform:none}
+.big{font-family:var(--f-display);font-weight:900;letter-spacing:.04em;line-height:1.16}
+.big em{font-style:normal;color:var(--gold)}
+.dim{color:var(--dim)}
+.read{position:relative;padding:1.6rem 1.7rem 1.8rem;text-shadow:0 0 18px var(--bg)}
+.read::before,.read::after{content:"";position:absolute;width:16px;height:16px;border:1px solid var(--dim);pointer-events:none}
+.read::before{top:0;left:0;border-right:0;border-bottom:0}
+.read::after{bottom:0;right:0;border-left:0;border-top:0}
+.read h2{font-weight:700;font-size:clamp(1.6rem,3vw,2.3rem);line-height:1.35;margin-bottom:.8rem}
+.read h3{font-weight:700;font-size:1.25rem;line-height:1.4;margin-bottom:.5rem}
+.read p+p{margin-top:.8rem}
+.rows{list-style:none;margin:1rem 0 0;padding:0;counter-reset:r}
+.rows li{display:grid;grid-template-columns:2.2rem 1fr;gap:.5rem;padding:.55rem 0;border-top:1px solid var(--faint);font-size:.95rem;counter-increment:r}
+.rows li::before{content:counter(r,decimal-leading-zero);font-family:var(--f-hud);font-size:.7rem;color:var(--dim);padding-top:.25em}
+
+/* chapters */
+.chap{min-height:92vh;display:flex;align-items:center;padding-block:6rem;max-width:1240px;margin:0 auto}
+.chap>.read{max-width:31rem}
+.chap.r{justify-content:flex-end}
+.chap.c{justify-content:center;text-align:center}
+.chap.c .lbl{justify-content:center}
+.chap.c>.read{max-width:40rem}
+.wide{max-width:1240px;margin:0 auto;padding-block:5rem}
+.wide.panel{background:var(--panel);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--faint);padding:clamp(1.5rem,4vw,3rem);margin-block:4rem}
+
+.hero{min-height:100svh;display:grid;align-content:end;padding-block:7rem clamp(5rem,12vh,8rem);max-width:1240px;margin:0 auto}
+.hero h1{font-size:clamp(2.5rem,7.4vw,6.2rem);max-width:11em;text-shadow:0 0 30px var(--bg)}
+.hero p{max-width:32em;margin-top:1.6rem;color:var(--dim);text-shadow:0 0 14px var(--bg)}
+.hero .acts{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:2rem}
+
+.pain{min-height:100vh;display:grid;align-content:center;padding-block:6rem;max-width:1240px;margin:0 auto}
+.pain h2{font-size:clamp(2.2rem,6.2vw,5.2rem);max-width:11em}
+.pain .desc{color:var(--dim);max-width:34em;margin-top:1.4rem}
+.chain{display:flex;flex-wrap:wrap;gap:.6rem 0;margin-top:2.4rem;font-size:clamp(1.1rem,2.4vw,1.6rem);font-weight:700}
+.chain span{display:flex;align-items:center}
+.chain span+span::before{content:"→";font-family:var(--f-hud);color:var(--gold);font-weight:300;margin:0 1rem}
+
+/* 7 orbit steps */
+.orbit{list-style:none;margin:2rem 0 0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0;border-top:1px solid var(--faint)}
+.orbit li{padding:1.1rem .9rem 0 0;position:relative;display:grid;gap:.25rem;align-content:start}
+.orbit li::before{content:"";position:absolute;top:-5px;left:0;width:9px;height:9px;border-radius:50%;background:var(--c,var(--dust))}
+.orbit b{font-family:var(--f-hud);font-size:.68rem;font-weight:400;color:var(--c,var(--dust));letter-spacing:.06em}
+.orbit strong{font-size:1rem;line-height:1.4}
+.orbit small{color:var(--dim);font-size:.84rem;line-height:1.55}
+@media (max-width:980px){.orbit{grid-template-columns:1fr;border-top:0;border-left:1px solid var(--faint);margin-left:4px}.orbit li{padding:.2rem 0 1.1rem 1.4rem}.orbit li::before{top:.55rem;left:-5px}}
+
+/* plates */
+.plates{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:clamp(2rem,5vw,4.5rem);align-items:center}
+.plates.flip{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+.plates.flip>.read{order:2}
+.plates+.plates{margin-top:clamp(3rem,7vw,6rem)}
+@media (max-width:900px){.plates,.plates.flip{grid-template-columns:1fr}.plates.flip>.read{order:0}}
+.plate{margin:0;display:grid;gap:.6rem}
+.plate button{position:relative;padding:10px;border:1px solid var(--faint);background:rgba(4,7,26,.6);cursor:zoom-in;display:block;width:100%}
+.plate button::before,.plate button::after{content:"";position:absolute;width:22px;height:22px;border:1px solid var(--gold)}
+.plate button::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.plate button::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.plate img{width:100%;filter:saturate(.9)}
+.plate figcaption{display:flex;justify-content:space-between;gap:1rem;font-family:var(--f-hud);font-size:.68rem;letter-spacing:.06em;color:var(--dim)}
+.plate figcaption span:last-child{font-family:var(--f-body);letter-spacing:0;font-size:.82rem;text-align:right}
+
+/* calc (galaxy skin) */
+.calc{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:2rem;margin-top:2rem}
+.calc-head{display:grid;grid-template-columns:8rem 1fr auto;gap:1rem;font-family:var(--f-hud);font-size:.66rem;letter-spacing:.1em;color:var(--dim);padding-bottom:.6rem}
+.calc-row{display:grid;grid-template-columns:8rem 1fr auto;gap:1rem;align-items:center;padding:.95rem 0;border-top:1px solid var(--faint)}
+.calc-row.off .seg:not(.w){opacity:.3}
+.calc-q strong{display:block}
+.calc-q small{display:block;color:var(--dim);font-size:.78rem;line-height:1.45}
+.seg{display:flex;flex-wrap:wrap;gap:.35rem}
+.seg button{border:1px solid var(--faint);background:transparent;border-radius:999px;padding:.3rem .75rem;font-size:.82rem;min-height:34px;color:var(--dim)}
+.seg button:hover{border-color:var(--blue);color:var(--ink)}
+.seg button.on{border-color:var(--blue);color:var(--bg);background:var(--blue);font-weight:700}
+.seg.w button.on{border-color:var(--gold);background:var(--gold)}
+.calc-out{display:grid;justify-items:center;align-content:center;gap:.6rem;text-align:center;border-left:1px solid var(--faint);padding-left:2rem}
+.calc-ring{position:relative;width:170px;height:170px}
+.calc-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.calc-ring circle{fill:none;stroke-width:3}
+.calc-ring .trk{stroke:var(--faint)}
+.calc-ring .arc{stroke:var(--gold);transition:stroke-dashoffset .6s cubic-bezier(.3,.7,.2,1);filter:drop-shadow(0 0 6px var(--gold))}
+.calc-ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:3.2rem;font-weight:300}
+.calc-tier{font-weight:700}
+.calc-tier[data-tier="hi"]{color:var(--hi)}.calc-tier[data-tier="mid"]{color:var(--gold)}.calc-tier[data-tier="lo"]{color:var(--dim)}
+.calc-formula{font-size:.76rem;color:var(--dim)}
+.calc-note{font-size:.8rem;color:var(--dim);max-width:22em;line-height:1.6}
+@media (max-width:900px){.calc{grid-template-columns:1fr}.calc-head{display:none}.calc-row{grid-template-columns:1fr;gap:.6rem}.calc-out{border-left:0;border-top:1px solid var(--faint);padding:1.5rem 0 0}}
+
+/* compare */
+.cmp{display:grid;gap:.1rem;margin-top:1rem}
+.cmp div{display:grid;grid-template-columns:1fr 3.2rem 3.2rem 3.2rem;gap:.6rem;padding:.42rem 0;border-top:1px solid var(--faint);font-size:.9rem;align-items:baseline}
+.cmp div span:not(:first-child){font-family:var(--f-hud);text-align:right;font-size:.85rem}
+.cmp .h{font-family:var(--f-hud);font-size:.64rem;letter-spacing:.06em;color:var(--dim);border-top:0}
+.cmp .up{color:var(--hi)}
+
+/* tenants */
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.5rem;margin-top:2rem}
+.three .read{padding:1.4rem 1.4rem 1.6rem}
+.three ul{margin:.6rem 0 0;padding-left:1.1rem;color:var(--dim);font-size:.92rem;display:grid;gap:.3rem}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.5rem;vertical-align:.05em}
+@media (max-width:860px){.three{grid-template-columns:1fr}}
+
+/* videos */
+.eps{list-style:none;margin:2rem 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.6rem 1.3rem}
+.ep{text-decoration:none;color:inherit;border:0;background:none;padding:0;text-align:left;display:grid;gap:.6rem;width:100%}
+.ep-img{position:relative;display:block;overflow:hidden;border:1px solid var(--faint);aspect-ratio:16/9;max-width:100%}
+.ep-img img{width:100%;height:100%;object-fit:cover;opacity:.82;transition:opacity .3s,transform .4s}
+.ep:hover .ep-img img{opacity:1;transform:scale(1.03)}
+.ep-len{position:absolute;right:.45rem;bottom:.45rem;background:rgba(4,7,26,.8);font-size:.7rem;padding:.05rem .45rem}
+.ep-play{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;border:1px solid var(--gold);background:rgba(4,7,26,.55)}
+.ep-play::after{content:"";position:absolute;left:20px;top:15px;border-left:13px solid var(--gold);border-top:9px solid transparent;border-bottom:9px solid transparent}
+.ep-meta{display:grid;gap:.1rem}
+.ep-no{font-size:.66rem;color:var(--gold);letter-spacing:.12em}
+.ep-meta strong{font-size:1rem}
+.ep-meta small{color:var(--dim);font-size:.84rem;line-height:1.5}
+@media (max-width:900px){.eps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.eps{grid-template-columns:1fr}}
+
+/* status */
+.gauges{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.5rem;margin-top:2rem}
+.gauges div{border-top:1px solid var(--gold);padding-top:.8rem;display:grid;gap:.15rem}
+.gauges b{font-family:var(--f-hud);font-weight:300;font-size:2.6rem;line-height:1.1}
+.gauges span{font-weight:700}
+.gauges small{color:var(--dim);font-size:.84rem;line-height:1.5}
+@media (max-width:860px){.gauges{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.log{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 2rem;list-style:none;margin:2rem 0 0;padding:0;font-size:.92rem}
+.log li{padding:.5rem 0;border-top:1px solid var(--faint);display:grid;grid-template-columns:1.6rem 1fr}
+.log li::before{content:"✦";color:var(--gold);font-size:.7rem;padding-top:.3em}
+@media (max-width:860px){.log{grid-template-columns:1fr}}
+
+.final{min-height:100vh;display:grid;align-content:center;padding-block:6rem;max-width:1240px;margin:0 auto}
+.final h2{font-size:clamp(2.4rem,7.2vw,6.2rem);margin-bottom:2rem}
+.mailrow{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
+.mailrow code{font-family:var(--f-hud);font-size:.88rem;border:1px solid var(--faint);padding:.5rem .9rem;user-select:all}
+.mailrow button{border:1px solid var(--faint);background:transparent;padding:.5rem .9rem;min-height:42px;border-radius:999px}
+footer{padding-block:2rem calc(env(safe-area-inset-bottom,0px) + 2.5rem);display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem;color:var(--dim);font-size:.86rem;border-top:1px solid var(--faint);background:var(--bg);max-width:none;margin:0 calc(-1*max(16px,env(safe-area-inset-right,0px))) 0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+dialog{border:0;padding:0;background:transparent;max-width:min(1100px,94vw);width:100%;color:var(--ink)}
+dialog::backdrop{background:rgba(2,4,14,.88)}
+.pl-bar{display:flex;justify-content:space-between;align-items:center;padding:.4rem 0 .6rem;font-family:var(--f-hud);font-size:.8rem}
+.pl-close{background:none;border:1px solid var(--faint);border-radius:999px;padding:.3rem .9rem}
+.player video{width:100%;aspect-ratio:16/9;background:#000;display:block;border:1px solid var(--faint)}
+.lightbox{cursor:zoom-out}
+.lb-cap{text-align:center;margin-top:.6rem;font-size:.9rem;color:var(--dim)}
+
+/* loop */
+.loop{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:clamp(1.5rem,4vw,3.5rem);align-items:center}
+.cycle{width:100%;max-width:380px;height:auto;display:block;margin:0 auto}
+.cycle text{font-family:var(--f-body);font-size:13px;fill:var(--cy-ink)}
+.cycle .flow{stroke:var(--cy-a);stroke-width:1.6;stroke-dasharray:4 16;animation:cyflow 1.6s linear infinite}
+@keyframes cyflow{to{stroke-dashoffset:-40}}
+@media (prefers-reduced-motion:reduce){.cycle .flow{animation:none}}
+.loop-copy{display:grid;gap:.9rem;color:var(--cy-dim)}
+.next{border:1px dashed var(--cy-line2);border-radius:var(--cy-r,10px);padding:1rem 1.1rem;display:grid;gap:.3rem;color:var(--cy-dim)}
+.next strong{color:var(--cy-ink)}
+.next-tag{justify-self:start;font-size:.72rem;letter-spacing:.08em;padding:.1rem .55rem;border-radius:999px;border:1px solid var(--cy-a);color:var(--cy-a)}
+@media (max-width:860px){.loop{grid-template-columns:1fr}}
+.loop{--cy-a:var(--gold);--cy-b:var(--blue);--cy-d:var(--dust);--cy-ink:var(--ink);--cy-dim:var(--dim);--cy-line:var(--faint);--cy-line2:rgba(244,184,92,.45);--cy-r:0}
+
+/* mcp */
+.mcp{display:grid;gap:clamp(1.5rem,3vw,2.2rem)}
+.mcp-lead{color:var(--mc-dim);max-width:40em}
+.mcp-chat{display:grid;gap:1rem;padding:clamp(1rem,3vw,1.6rem);border:1px solid var(--mc-line);border-radius:var(--mc-r,14px);background:var(--mc-card)}
+.mcp-tabs{display:flex;flex-wrap:wrap;gap:.4rem}
+.mcp-tabs button{display:inline-flex;align-items:center;gap:.5rem;border:1px solid var(--mc-line);background:transparent;border-radius:999px;padding:.4rem 1rem;min-height:40px;color:var(--mc-dim);font-size:.92rem}
+.mcp-tabs button i{width:9px;height:9px;border-radius:50%;background:var(--rc)}
+.mcp-tabs button[aria-selected="true"]{border-color:var(--rc);color:var(--mc-ink);font-weight:700;box-shadow:inset 0 0 0 1px var(--rc)}
+.mcp-panel{display:grid;gap:.7rem}
+.mcp-panel[hidden]{display:none}
+.turn{display:flex}
+.turn p{margin:0;max-width:min(36rem,88%);padding:.7rem .95rem;font-size:.94rem;line-height:1.7}
+.turn.u{justify-content:flex-end}
+.turn.u p{background:var(--mc-bubble);border-radius:14px 14px 3px 14px;color:var(--mc-ink)}
+.turn.a{flex-direction:column;align-items:flex-start;gap:.3rem}
+.turn.a p{border:1px solid var(--mc-line);border-left:2px solid var(--rc);border-radius:3px 14px 14px 14px;color:var(--mc-ink)}
+.turn.a b{color:var(--rc)}
+.tool{font-size:.7rem;letter-spacing:.04em;color:var(--mc-dim);padding-left:.2rem}
+.mcp-demo{margin:0;font-size:.78rem;color:var(--mc-dim)}
+.mcp-trust{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.2rem}
+.mcp-trust li{display:grid;gap:.3rem;border-top:1px solid var(--mc-accent);padding-top:.7rem;font-size:.9rem;color:var(--mc-dim);line-height:1.6}
+.mcp-trust strong{color:var(--mc-ink);font-size:.98rem}
+.mcp-market{display:grid;gap:.9rem;padding:clamp(1.2rem,3vw,1.8rem);border-radius:var(--mc-r,12px);background:var(--mc-mk-bg);color:var(--mc-mk-ink)}
+.mcp-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.2rem}
+.mcp-nums div{display:grid;gap:.2rem}
+.mcp-nums b{font-size:clamp(2.2rem,5vw,3.2rem);font-weight:300;line-height:1.05;color:var(--mc-mk-num)}
+.mcp-nums span{font-size:.9rem;line-height:1.5;opacity:.85}
+.mcp-market p{margin:0;max-width:44em}
+.mcp-market small{opacity:.65;font-size:.78rem}
+.mcp .next{border:1px dashed var(--mc-accent);border-radius:var(--mc-r,10px);padding:1rem 1.1rem;display:grid;gap:.3rem;color:var(--mc-dim)}
+.mcp .next strong{color:var(--mc-ink)}
+.mcp .next p{margin:0}
+.mcp .next-tag{justify-self:start;font-size:.72rem;letter-spacing:.08em;padding:.1rem .55rem;border-radius:999px;border:1px solid var(--mc-accent);color:var(--mc-accent)}
+@media (max-width:960px){.mcp-trust{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.mcp-trust,.mcp-nums{grid-template-columns:1fr}}
+.mcp{--mc-org:var(--gold);--mc-exh:var(--blue);--mc-opr:var(--dust);--mc-ink:var(--ink);--mc-dim:var(--dim);--mc-line:var(--faint);--mc-card:rgba(6,9,30,.55);--mc-bubble:rgba(141,185,255,.08);--mc-accent:var(--gold);--mc-r:0;--mc-mk-bg:rgba(244,184,92,.08);--mc-mk-ink:var(--ink);--mc-mk-num:var(--gold)}
+.mcp-nums b{font-family:var(--f-hud)}
+</style>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="hud tl"><a class="brand" href="#top" aria-label="Albireo 回到頂端">
+  <svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13.5" fill="none" stroke="var(--faint)"/><circle cx="10.5" cy="15" r="4.2" fill="var(--gold)"/><circle cx="20.5" cy="15" r="2.8" fill="var(--blue)"/><path d="M14.7 15h3" stroke="var(--ink)" stroke-width="1.1"/></svg>
+  <span><b>ALBIREO</b><span>展會媒合平台</span></span></a></div>
+<div class="hud tr"><a class="btn" href="#contact">預約展示</a></div>
+<div class="hud bl" aria-hidden="true"><div>航程</div><div class="val num" id="leg">000 / 100</div><div id="legname">起點</div></div>
+
+<main id="top">
+  <section class="hero" data-leg="起點">
+    <div>
+      <div class="lbl">β Cygni<span>輦道增七　金藍雙星</span></div>
+      <h1 class="big">讓該見面的人，在展會上相遇。</h1>
+      <p>肉眼看去只是一顆星，透過望遠鏡才分得出一金一藍兩顆星並肩發光。Albireo 讀懂每位參加者寫下的「我是誰」與「我想找誰」，算出速配度、寫出值得一見的理由，再排成一張照表就能會面的時程表。</p>
+      <div class="acts"><a class="btn" href="#contact">預約產品展示</a><a class="btn ghost" data-play="01" href="#" target="_blank" rel="noopener">播放 2 分鐘總覽 ↗</a></div>
+    </div>
+  </section>
+
+  <section class="pain" data-leg="痛點" aria-labelledby="p-t">
+    <div>
+      <div class="lbl">Problem<span>我們看見的問題</span></div>
+      <h2 id="p-t" class="big">不懂產業，<br>就只能<em>憑感覺</em>配對。</h2>
+      <p class="desc">展會活動公司擅長把活動辦起來，卻很難同時懂每一家參展廠商的產業。負責配對的人不熟悉產品與市場，只能看公司名稱排，甚至隨機湊對。</p>
+      <div class="chain"><span>配對不準</span><span>洽談沒有成效</span><span>廠商不再參加</span></div>
+    </div>
+  </section>
+
+  <section class="wide panel" data-leg="航線" aria-labelledby="f-t">
+    <div class="lbl">Route<span>一場媒合活動的七個站點</span></div>
+    <h2 id="f-t" style="font-size:clamp(1.7rem,3.4vw,2.6rem);line-height:1.35;max-width:20em">從建立活動到發布時程表，每一站都有人負責、有系統把關。</h2>
+    <ol class="orbit">
+      <li style="--c:var(--gold)"><b>01 主辦</b><strong>建立活動</strong><small>組別、名額、時程、規則、時區</small></li>
+      <li style="--c:var(--blue)"><b>02 參展</b><strong>報名</strong><small>填寫自述與期望</small></li>
+      <li style="--c:var(--gold)"><b>03 主辦</b><strong>審核配號</strong><small>核可即配發編號，不回收</small></li>
+      <li style="--c:var(--blue)"><b>04 參展</b><strong>雙方互選</strong><small>看速配度，排定志願</small></li>
+      <li style="--c:var(--hi)"><b>05 系統</b><strong>排出時程表</strong><small>互選、單向、補位</small></li>
+      <li style="--c:var(--gold)"><b>06 主辦</b><strong>微調</strong><small>移動、交換、鎖定</small></li>
+      <li style="--c:var(--gold)"><b>07 主辦</b><strong>發布</strong><small>參展單位查看個人行程</small></li>
+    </ol>
+  </section>
+
+  <section class="chap" data-leg="星系核心" aria-labelledby="ai-t">
+    <div class="read">
+      <div class="lbl">Core<span>星系核心　AI 速配度</span></div>
+      <h2 id="ai-t">我的期望，對上對方的自述。</h2>
+      <p class="dim">報名表的每一題拆成兩種填法：自述是「我是誰、我做什麼」，期望是「我想找什麼樣的對象」。每一題各自算出 0 到 1 分，依主辦單位設定的權重加權平均，換算成滿分 100。</p>
+    </div>
+  </section>
+
+  <section class="wide panel" data-leg="試算" aria-labelledby="calc-t">
+    <div class="lbl">Instrument<span>速配度試算</span></div>
+    <h3 id="calc-t" style="font-size:1.4rem">調整比對結果與權重，看分數怎麼變。</h3>
+<div class="calc" id="calc">
+  <div class="calc-rows">
+    <div class="calc-head"><span>題目</span><span>對方的自述，對上我的期望</span><span>權重</span></div>
+    <div class="calc-row" data-q="biz">
+      <div class="calc-q"><strong>業務項目</strong><small>沒命中時交給 AI 判斷相近程度，最高 0.75</small></div>
+      <div class="seg" role="radiogroup" aria-label="業務項目比對結果">
+        <button type="button" data-v="1">命中 1</button><button type="button" data-v="0.75">AI 判斷相近 0.75</button><button type="button" data-v="0.5">對方未填 0.5</button><button type="button" data-v="0">沒命中 0</button>
+      </div>
+      <div class="seg w" role="radiogroup" aria-label="業務項目權重">
+        <button type="button" data-w="0">不計</button><button type="button" data-w="1">低</button><button type="button" data-w="2">一般</button><button type="button" data-w="3">高</button>
+      </div>
+    </div>
+    <div class="calc-row" data-q="mkt">
+      <div class="calc-q"><strong>經營市場</strong><small>沒填期望時，看雙方市場重疊的比例</small></div>
+      <div class="seg" role="radiogroup" aria-label="經營市場比對結果">
+        <button type="button" data-v="1">命中 1</button><button type="button" data-v="0.5">重疊一半 0.5</button><button type="button" data-v="0">沒命中 0</button>
+      </div>
+      <div class="seg w" role="radiogroup" aria-label="經營市場權重">
+        <button type="button" data-w="0">不計</button><button type="button" data-w="1">低</button><button type="button" data-w="2">一般</button><button type="button" data-w="3">高</button>
+      </div>
+    </div>
+    <div class="calc-row" data-q="lang">
+      <div class="calc-q"><strong>外語能力</strong><small>期望中任一項符合就算命中</small></div>
+      <div class="seg" role="radiogroup" aria-label="外語能力比對結果">
+        <button type="button" data-v="1">命中 1</button><button type="button" data-v="0.5">對方未填 0.5</button><button type="button" data-v="0">沒命中 0</button>
+      </div>
+      <div class="seg w" role="radiogroup" aria-label="外語能力權重">
+        <button type="button" data-w="0">不計</button><button type="button" data-w="1">低</button><button type="button" data-w="2">一般</button><button type="button" data-w="3">高</button>
+      </div>
+    </div>
+  </div>
+  <div class="calc-out" aria-live="polite">
+    <div class="calc-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="52"/><circle class="arc" id="calc-arc" cx="60" cy="60" r="52"/></svg><b class="num" id="calc-score">83</b></div>
+    <div class="calc-tier" id="calc-tier">高度相符</div>
+    <div class="calc-formula num" id="calc-formula">(1×3 + 0.5×2 + 1×1) ÷ (3+2+1)</div>
+    <small class="calc-note">70 分以上為高度相符，45 到 69 分為部分相符。權重由主辦單位在報名欄位逐題設定。</small>
+  </div>
+</div>
+
+  </section>
+
+  <section class="wide" data-leg="觀測影像">
+    <div class="plates">
+      <div class="read">
+        <div class="lbl">Plate 01<span>參展單位前台</span></div>
+        <h3>每個候選對象都有速配度，也有理由。</h3>
+        <p class="dim">卡片左上角是滿分 100 的速配度，下方標出符合你的哪幾項條件。點「請 AI 撰寫」，AI 依雙方填寫的資料用一兩句話說明為什麼值得見面，也點出洽談時要再確認的地方。</p>
+        <ul class="rows"><li>AI 只看對方公開給你的資料</li><li>理由的長度與語氣由主辦單位逐場設定</li><li>AI 暫時無法使用時，改以條件比對顯示</li></ul>
+      </div>
+      <figure class="plate"><button type="button" data-zoom="media/mate2_cards.jpg" data-cap="參展單位挑選洽談對象，每張卡片都有 AI 速配度" aria-label="挑選洽談對象畫面"><img src="media/mate2_cards.jpg" alt="候選卡片顯示 AI 速配度 94 分" loading="lazy" width="1537" height="784"></button><figcaption><span>OBS-07 · 02</span><span>挑選洽談對象</span></figcaption></figure>
+    </div>
+    <div class="plates flip">
+      <div class="read">
+        <div class="lbl">Plate 02<span>主辦單位後台</span></div>
+        <h3>兩個排程引擎，並排比較。</h3>
+        <p class="dim">AI 配對引擎以速配度加上志願加分計算：第一志願加 0.3、第二志願加 0.15，互選的組合兩邊都加。比較時不會寫入時程表，看完再決定採用哪一份。</p>
+        <div class="cmp" role="table" aria-label="兩個引擎的排程比較（示範資料）">
+          <div class="h" role="row"><span>項目</span><span>原排程</span><span>AI</span><span>差異</span></div>
+          <div role="row"><span>會談總數</span><span>27</span><span>28</span><span class="up">+1</span></div>
+          <div role="row"><span>買家選了賣家</span><span>7</span><span>10</span><span class="up">+3</span></div>
+          <div role="row"><span>賣家選了買家</span><span>2</span><span>5</span><span class="up">+3</span></div>
+          <div role="row"><span>每家賣家最少場次</span><span>3</span><span>4</span><span class="up">+1</span></div>
+          <div role="row"><span>平均 AI 速配度</span><span>43</span><span>46</span><span class="up">+3</span></div>
+        </div>
+        <p class="dim" style="font-size:.78rem;margin-top:.6rem">示範資料，取自後台「AI 排程比較」。</p>
+      </div>
+      <figure class="plate"><button type="button" data-zoom="media/cmp_result.jpg" data-cap="AI 排程比較：兩個引擎的結果並排" aria-label="AI 排程比較畫面"><img src="media/cmp_result.jpg" alt="AI 排程比較對話框" loading="lazy" width="1537" height="784"></button><figcaption><span>OBS-08 · 09</span><span>AI 排程比較</span></figcaption></figure>
+    </div>
+    <div class="plates">
+      <div class="read">
+        <div class="lbl">Plate 03<span>時程表</span></div>
+        <h3>可以重現，每一場都說得出原因。</h3>
+        <p class="dim">先排雙方互選，再排單向選擇，最後補空時段；同樣的資料和隨機種子，一定排出同樣的結果。顏色代表排入原因，沒排到的志願也列出原因。</p>
+        <ul class="rows"><li>移動、交換、鎖定、手動新增，只列出不衝突的組合</li><li>全部重排保留鎖定與手動加入的會談</li><li>發布前檢查志願排入率、空桌比例與每家場次</li></ul>
+      </div>
+      <figure class="plate"><button type="button" data-zoom="media/sch_table_pub.jpg" data-cap="已發布的桌位表" aria-label="桌位表畫面"><img src="media/sch_table_pub.jpg" alt="時程表桌位表" loading="lazy" width="1537" height="784"></button><figcaption><span>OBS-08 · 13</span><span>桌位表</span></figcaption></figure>
+    </div>
+  </section>
+
+  <section class="wide panel" data-leg="正向循環" aria-labelledby="loop-t">
+    <div class="lbl">Loop<span>正向循環</span></div>
+    <h2 id="loop-t" style="font-size:clamp(1.7rem,3.4vw,2.6rem);line-height:1.35;margin-bottom:2rem">每辦一屆，下一屆就更好辦。</h2>
+<div class="loop">
+  <svg class="cycle" viewBox="0 0 320 230" role="img" aria-label="精準配對、洽談有成效、參展意願提升、累積更多媒合資料，形成正向循環">
+    <ellipse cx="160" cy="115" rx="112" ry="76" fill="none" stroke="var(--cy-line)" stroke-width="1.5"/>
+    <ellipse class="flow" cx="160" cy="115" rx="112" ry="76" fill="none"/>
+    <circle cx="160" cy="39" r="6" fill="var(--cy-a)"/><circle cx="272" cy="115" r="5" fill="var(--cy-d)"/>
+    <circle cx="160" cy="191" r="5" fill="var(--cy-d)"/><circle cx="48" cy="115" r="6" fill="var(--cy-b)"/>
+    <text x="160" y="66" text-anchor="middle">精準配對</text>
+    <text x="256" y="119" text-anchor="end">洽談有成效</text>
+    <text x="160" y="172" text-anchor="middle">參展意願提升</text>
+    <text x="64" y="119">累積更多媒合資料</text>
+  </svg>
+  <div class="loop-copy">
+    <p>每一場活動的報名題目、權重設定、雙方的自述與志願、排程結果，都留在 Albireo。下一屆直接建立副本，從上一屆的設定開始調整，不必從零開始。發布前檢查留下的志願排入率、每家場次與空桌比例，也讓主辦單位清楚知道下一屆可以怎麼調得更好。</p>
+    <p>配對越準，廠商帶得走成果，下一屆更願意參加；參加的單位越多，累積的媒合資料也越多。</p>
+    <div class="next"><span class="next-tag">下一步・規劃中</span><strong>從歷史資料學習</strong><p>Albireo 將分析過往每一屆的互選、排程與洽談結果，自動建議題目權重與配對方向。每多辦一屆，配對就更貼近參加者真正想見的人。</p></div>
+  </div>
+</div>
+
+  </section>
+
+  <section class="wide" data-leg="三方星域" aria-labelledby="t-t">
+    <div class="lbl">Constellation<span>多租戶</span></div>
+    <h2 id="t-t" style="font-size:clamp(1.7rem,3.4vw,2.6rem);line-height:1.35;max-width:20em">一套平台，同時服務多個主辦單位。</h2>
+    <p class="dim" style="max-width:36em;margin-top:.8rem">每個主辦單位都有專屬網址、帳號、角色權限與資料，彼此完全隔離。所有對外文字中英雙語，活動以舉辦地時區設定，國外買家也能直接操作。</p>
+    <div class="three">
+      <div class="read"><h3><i class="dot" style="background:var(--dust)"></i>平台營運單位</h3><ul><li>開設主辦單位與專屬網址</li><li>登記子網域或自有網域</li><li>統一維護後台功能選單</li></ul></div>
+      <div class="read"><h3><i class="dot" style="background:var(--gold)"></i>主辦單位</h3><ul><li>自己管理團隊與角色權限</li><li>審核參展單位註冊</li><li>完成活動設定與排程</li></ul></div>
+      <div class="read"><h3><i class="dot" style="background:var(--blue)"></i>參展單位</h3><ul><li>自助註冊，多人共用帳號</li><li>報名、互選、查看時程表</li><li>中英文介面一鍵切換</li></ul></div>
+    </div>
+  </section>
+
+  <section class="wide panel" data-leg="AI 串接" aria-labelledby="mcp-t">
+    <div class="lbl">Uplink<span>AI 串接・MCP</span></div>
+    <h2 id="mcp-t" style="font-size:clamp(1.7rem,3.4vw,2.6rem);line-height:1.35;margin-bottom:1rem">把活動資料，交給你的 AI 助理。</h2>
+<div class="mcp">
+  <p class="mcp-lead">Albireo 為平台營運、主辦單位、參展單位各開一個 MCP 主機。接上 Claude 這類 AI 助理之後，直接用中文提問，AI 會自己挑工具查資料、整理成答案，不用再到後台一頁一頁翻。</p>
+  <div class="mcp-chat">
+    <div class="mcp-tabs" role="tablist" aria-label="選擇身分">
+      <button type="button" role="tab" aria-selected="true" data-tab="org" style="--rc:var(--mc-org)"><i></i>主辦單位</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="exh" style="--rc:var(--mc-exh)"><i></i>參展單位</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="opr" style="--rc:var(--mc-opr)"><i></i>平台營運</button>
+    </div>
+    <div class="mcp-panel" role="tabpanel" data-panel="org" style="--rc:var(--mc-org)">
+      <div class="turn u"><p>幫我健檢「國際旅遊 B2B 洽談會」的設定。</p></div>
+      <div class="turn a"><span class="tool num">⚙ matching_get</span><p>檢查完了。報名、互選、結果公布的日期先後正確；時段共 12 輪，每輪最多 16 場，容量足夠。<b>有 2 家買家還沒設桌號（B004、B007）</b>，建議排程前補上。</p></div>
+      <div class="turn u"><p>被選最多的前 3 個賣家是誰？</p></div>
+      <div class="turn a"><span class="tool num">⚙ application_list</span><p>1. 檜木森林民宿：被 9 家選，其中 4 組是互選<br>2. 環島觀光客運：被 7 家選<br>3. 北海岸海洋樂園：被 6 家選</p></div>
+      <div class="turn u"><p>B002 有選卻沒排到的是誰？為什麼？</p></div>
+      <div class="turn a"><span class="tool num">⚙ application_get</span><p>B002 選了 5 家，排進 4 場。沒排到的是第 4 志願「雲棲溫泉酒店」，原因是對方當天的場次已經排滿。</p></div>
+    </div>
+    <div class="mcp-panel" role="tabpanel" data-panel="exh" style="--rc:var(--mc-exh)" hidden>
+      <div class="turn u"><p>我選的對象裡，誰也選了我？</p></div>
+      <div class="turn a"><span class="tool num">⚙ application_get</span><p>你選的 5 家裡，有 2 家也選了你：檜木森林民宿（你的第 1 志願）、環島觀光客運（你的第 3 志願）。互選的組合會最優先排進時程表。</p></div>
+      <div class="turn u"><p>我當天幾點跟誰談、在幾號桌？</p></div>
+      <div class="turn a"><span class="tool num">⚙ schedule_get</span><p>你有 4 場洽談（台北時間）：<br>10:00　檜木森林民宿・3 號桌<br>10:40　環島觀光客運・7 號桌<br>11:20　空檔<br>13:00　北海岸海洋樂園・5 號桌<br>13:40　茶山體驗農場・2 號桌</p></div>
+    </div>
+    <div class="mcp-panel" role="tabpanel" data-panel="opr" style="--rc:var(--mc-opr)" hidden>
+      <div class="turn u"><p>平台上有哪些主辦單位？各自的活動狀況？</p></div>
+      <div class="turn a"><span class="tool num">⚙ organizer_list・matching_list</span><p>目前有 3 個主辦單位，都在啟用中。其中 demo 有 4 場活動：1 場互選中、2 場報名中、1 場已公布結果；報名中的兩場共有 6 筆報名在等審核。</p></div>
+    </div>
+    <p class="mcp-demo">示範對話，內容為示範資料。⚙ 是 AI 自己選用的 Albireo 查詢工具。</p>
+  </div>
+  <ul class="mcp-trust">
+    <li><strong>權限等同本人</strong><span>用自己發行的金鑰連線，看得到的資料和登入後台時一樣，沒有權限的功能不會出現。</span></li>
+    <li><strong>第一版只做查詢</strong><span>審核、排程、發布都留在後台操作，AI 不會替你改資料。</span></li>
+    <li><strong>聯絡資訊預設不給</strong><span>只有明確說要聯絡某個單位時，才會查信箱與電話。</span></li>
+    <li><strong>金鑰隨時可撤銷</strong><span>發行時必須設到期日，每位使用者也有流量上限。</span></li>
+  </ul>
+  <div class="mcp-market">
+    <div class="mcp-nums">
+      <div><b class="num">17</b><span>家 B2B 媒合平台納入調查</span></div>
+      <div><b class="num">5</b><span>家在 2026 年推出官方 MCP，全部只開放給主辦方</span></div>
+      <div><b class="num">0</b><span>家提供參展商使用的 MCP</span></div>
+    </div>
+    <p>已經有使用者替其中幾家平台自行做出非官方的 MCP，代表需求確實存在。Albireo 讓三種身分都能直接接上 AI。</p>
+    <small>資料來源：Riversoft 產品調研，2026 年 10 月。</small>
+  </div>
+  <div class="next"><span class="next-tag">下一步・規劃中</span><strong>貼上網址就能連線</strong><p>支援 OAuth 登入，主辦單位在 claude.ai 貼上網址就能連線；再開放少量批次操作，由伺服器端先預覽、使用者確認後才執行。</p></div>
+</div>
+
+  </section>
+
+  <section class="wide" id="videos" data-leg="航行紀錄" aria-labelledby="v-t">
+    <div class="lbl">Flight log<span>九集功能介紹，約 24 分鐘</span></div>
+    <h2 id="v-t" style="font-size:clamp(1.7rem,3.4vw,2.6rem);line-height:1.35">用實際畫面，看完整條航線。</h2>
+    <p style="margin-top:1rem"><a class="btn ghost" data-folder href="#" target="_blank" rel="noopener">在 Google Drive 開啟全部影片 ↗</a></p>
+    <ul class="eps" id="eps"></ul>
+  </section>
+
+  <section class="wide panel" data-leg="任務日誌" aria-labelledby="s-t">
+    <div class="lbl">Mission log<span>產品現況</span></div>
+    <h2 id="s-t" style="font-size:clamp(1.6rem,3vw,2.3rem);line-height:1.35;max-width:22em">在真實的展會裡淬鍊出來，現在整套流程已經可以跑完。</h2>
+    <p class="dim" style="max-width:38em;margin-top:.8rem">我們在一次次的展會系統專案裡，看見媒合反覆卡在同一個地方：配對的人不熟悉產業，見面的人談不出結果。這套媒合功能先在實際的展會中上線使用，團隊再把它拆出來、重新打磨，做成可以服務多個主辦單位的產品。</p>
+    <div class="gauges">
+      <div><b>3</b><span>個入口</span><small>營運後台、主辦後台、參展前台</small></div>
+      <div><b>7</b><span>個步驟</span><small>端到端可操作</small></div>
+      <div><b>2</b><span>個排程引擎</span><small>可並排比較</small></div>
+      <div><b>3</b><span>個 MCP 主機</span><small>營運、主辦、參展各一個</small></div>
+    </div>
+    <ul class="log">
+      <li>多租戶隔離與自有網域</li><li>角色權限矩陣</li><li>參展單位自助註冊與審核</li>
+      <li>中英雙語、舉辦地時區</li><li>自述與期望報名欄位</li><li>名額即時計算、自動配號</li>
+      <li>四步驟互選與志願序</li><li>AI 速配度與推薦理由</li><li>規則切割時段、容量預覽</li>
+      <li>可重現排程與排入原因</li><li>鎖定、交換、只補空時段</li><li>發布前檢查與個人時程表</li><li>MCP 串接：三種身分各一個查詢主機</li><li>九集功能介紹影片</li>
+    </ul>
+  </section>
+
+  <section class="final" id="contact" data-leg="啟航" aria-labelledby="c-t">
+    <div>
+      <div class="lbl">Launch<span>啟航</span></div>
+      <h2 id="c-t" class="big">下一場展會，<br>讓配對<em>先完成</em>。</h2>
+      <div class="mailrow"><code id="mail">[聯絡信箱]</code><button type="button" data-copy="[聯絡信箱]" data-target="mail">複製信箱</button></div>
+    </div>
+  </section>
+</main>
+<footer><span>Albireo 展會媒合平台　由 Riversoft 打造</span><span>產品畫面皆為示範資料</span></footer>
+<dialog class="lightbox" id="lightbox" aria-label="放大畫面">
+  <img src="" alt="">
+  <p class="lb-cap"></p>
+</dialog>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+/* ---------- 速配度試算 ---------- */
+const calc=document.getElementById('calc');
+if(calc){
+  const st={biz:{v:1,w:3},mkt:{v:.5,w:2},lang:{v:1,w:1}};
+  const fmt=n=>String(+n.toFixed(2));
+  function render(){
+    let num=0,den=0;const parts=[],ws=[];
+    for(const k in st){const {v,w}=st[k];if(!w)continue;num+=v*w;den+=w;parts.push(fmt(v)+'×'+w);ws.push(w);}
+    const s=den?Math.round(num/den*100):0;
+    document.getElementById('calc-score').textContent=s;
+    const tier=s>=70?'高度相符':s>=45?'部分相符':'相符度低';
+    const t=document.getElementById('calc-tier');t.textContent=den?tier:'所有題目都不計分';t.dataset.tier=s>=70?'hi':s>=45?'mid':'lo';
+    document.getElementById('calc-formula').textContent=den?'('+parts.join(' + ')+') ÷ ('+ws.join('+')+') = '+s:'—';
+    const c=2*Math.PI*52;const arc=document.getElementById('calc-arc');
+    arc.style.strokeDasharray=c;arc.style.strokeDashoffset=c*(1-s/100);
+    calc.querySelectorAll('.calc-row').forEach(row=>{const q=st[row.dataset.q];
+      row.querySelectorAll('[data-v]').forEach(b=>{const on=+b.dataset.v===q.v;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+      row.querySelectorAll('[data-w]').forEach(b=>{const on=+b.dataset.w===q.w;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+      row.classList.toggle('off',q.w===0);});
+  }
+  calc.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const q=st[b.closest('.calc-row').dataset.q];
+    if(b.dataset.v!=null)q.v=+b.dataset.v;if(b.dataset.w!=null)q.w=+b.dataset.w;render();});
+  render();
+}
+
+/* ---------- 介紹影片 ---------- */
+const EPS=[
+ ['01','系統總覽','七個步驟、三個入口，五分鐘看懂整個平台','2:03'],
+ ['02','多租戶架構','營運單位、主辦單位、參展單位，三方各司其職','2:26'],
+ ['03','活動設定','中英雙語、舉辦地時區、組別與名額逐場設定','3:01'],
+ ['04','報名與審核','六個階段自動切換，核可時自動配發編號','2:44'],
+ ['05','報名欄位：自述與期望','每一題分成「我是誰」與「我想找誰」','2:11'],
+ ['06','互選與志願序','四個步驟挑選對象，主辦可以代為調整','2:31'],
+ ['07','AI 速配度與推薦理由','計分方式、推薦理由與 AI 配對引擎','4:18'],
+ ['08','時段設定與排程','規則切割時段，兩個引擎並排比較','2:55'],
+ ['09','手動微調與發布','發布前檢查、鎖定、交換與發布','2:17']
+];
+/* 影片放在 Google Drive：填入每一集的檔案 ID；空白時連到整個資料夾 */
+const FOLDER='https://drive.google.com/drive/folders/1mV2XszLzrDZO-DE4nz1CeAZIIlA7mnu2';
+const IDS={'01':'1Y1ZS6viJUE4wUIHB9_ZR_znjEK_r7px-','02':'1tWYTWlk2eqlkyAMwMQ8JdREfLpEwWVzE','03':'1nF1FxuGxC0PXviNOjHGRAMKjw8LkyJgK','04':'1spR-ZXqdWI5KZNSEXd--xoVRquUF0NlF','05':'1HQV-60P85svpdgSxWLUwRkEsHg5hov6y','06':'1Bsku-6OJQoIvLT8dfY-aUhSyh8ArFZmR','07':'1bySZfdpNpN-RCxbolBKj1smvHCUmqTXL','08':'1jamBCrUoI-2CCu_YwmYEUtKT29TtwI4a','09':'1vb-kz__Xt4wWsqSVrSKhzbIEhzo9e2sz'};
+const href=n=>IDS[n]?'https://drive.google.com/file/d/'+IDS[n]+'/view':FOLDER;
+const grid=document.getElementById('eps');
+if(grid){
+  grid.innerHTML=EPS.map(([n,t,d,len])=>'<li><a class="ep" href="'+href(n)+'" target="_blank" rel="noopener"><span class="ep-img"><img src="media/p'+n+'.jpg" alt="" loading="lazy" width="960" height="540"><span class="ep-len num">'+len+'</span><span class="ep-play" aria-hidden="true"></span></span><span class="ep-meta"><span class="ep-no num">EP '+n+' · Google Drive ↗</span><strong>'+t+'</strong><small>'+d+'</small></span></a></li>').join('');
+}
+document.querySelectorAll('[data-play]').forEach(el=>{el.href=href(el.dataset.play);});
+document.querySelectorAll('[data-folder]').forEach(el=>{el.href=FOLDER;});
+
+/* ---------- MCP 對話分頁 ---------- */
+document.querySelectorAll('.mcp-chat').forEach(c=>{const tabs=[...c.querySelectorAll('[data-tab]')];
+  tabs.forEach(b=>b.addEventListener('click',()=>{tabs.forEach(x=>x.setAttribute('aria-selected',x===b));
+    c.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==b.dataset.tab);}));});
+
+/* ---------- 截圖放大 ---------- */
+const lb=document.getElementById('lightbox');
+if(lb){
+  document.addEventListener('click',e=>{const f=e.target.closest('[data-zoom]');if(!f)return;
+    lb.querySelector('img').src=f.dataset.zoom;lb.querySelector('img').alt=f.getAttribute('aria-label')||'';
+    lb.querySelector('.lb-cap').textContent=f.dataset.cap||'';lb.showModal?lb.showModal():lb.setAttribute('open','');});
+  lb.addEventListener('click',()=>lb.close?lb.close():lb.removeAttribute('open'));
+}
+
+/* ---------- 複製信箱 ---------- */
+document.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{
+  const t=b.dataset.copy,done=()=>{const o=b.textContent;b.textContent='已複製';setTimeout(()=>b.textContent=o,1600);};
+  try{navigator.clipboard.writeText(t).then(done,()=>sel(b));}catch(e){sel(b);}
+}));
+function sel(b){const el=document.getElementById(b.dataset.target);if(!el)return;const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);}
+})();
+
+</script>
+<script>
+(function(){
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t,smooth=t=>t*t*(3-2*t);
+const legs=[...document.querySelectorAll('[data-leg]')];
+function hudTick(){const y=scrollY,max=document.documentElement.scrollHeight-innerHeight;
+  document.getElementById('leg').textContent=String(Math.round(clamp(y/(max||1),0,1)*100)).padStart(3,'0')+' / 100';
+  let n=legs[0].dataset.leg;legs.forEach(s=>{if(s.getBoundingClientRect().top<innerHeight*.5)n=s.dataset.leg;});document.getElementById('legname').textContent=n;}
+addEventListener('scroll',hudTick,{passive:true});hudTick();
+if(!window.THREE)return;
+let renderer;try{renderer=new THREE.WebGLRenderer({canvas:document.getElementById('sky'),antialias:true,alpha:true});}catch(e){return;}
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(20261020);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(55,1,.1,3000);
+function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+resize();addEventListener('resize',resize);
+const tc=document.createElement('canvas');tc.width=tc.height=64;const g=tc.getContext('2d'),gr=g.createRadialGradient(32,32,0,32,32,32);
+gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.22,'rgba(255,255,255,.9)');gr.addColorStop(.55,'rgba(255,255,255,.16)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,64,64);
+const tex=new THREE.CanvasTexture(tc);
+const gold=new THREE.Color('#F4B85C'),blue=new THREE.Color('#8DB9FF'),dust=new THREE.Color('#8C92C8');
+const N=reduce?5000:11000,p=new Float32Array(N*3),c=new Float32Array(N*3);
+for(let i=0;i<N;i++){const arm=i%3,r=Math.pow(R(),1.5)*180+3,a=arm*Math.PI*2/3+r*.032+(R()-.5)*(.9-r/300);
+  p[i*3]=Math.cos(a)*r+(R()-.5)*(10+r*.08);p[i*3+1]=(R()-.5)*(10*(1-r/210)+1.5);p[i*3+2]=Math.sin(a)*r+(R()-.5)*(10+r*.08);
+  const t=r/180,col=new THREE.Color().copy(gold).lerp(dust,clamp(t*1.6,0,1)).lerp(blue,clamp(t-.45,0,1));c.set([col.r,col.g,col.b],i*3);}
+const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(p,3));geo.setAttribute('color',new THREE.BufferAttribute(c,3));
+const galaxy=new THREE.Points(geo,new THREE.PointsMaterial({size:1.5,map:tex,transparent:true,depthWrite:false,vertexColors:true,opacity:.55,blending:THREE.AdditiveBlending}));scene.add(galaxy);
+const F=1800,fp=new Float32Array(F*3);for(let i=0;i<F;i++){const a=R()*Math.PI*2,b=Math.acos(2*R()-1),r=600+R()*900;fp.set([Math.sin(b)*Math.cos(a)*r,Math.cos(b)*r,Math.sin(b)*Math.sin(a)*r],i*3);}
+const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.BufferAttribute(fp,3));
+scene.add(new THREE.Points(fg,new THREE.PointsMaterial({size:3,map:tex,transparent:true,depthWrite:false,opacity:.5,blending:THREE.AdditiveBlending})));
+// matched pairs: gold↔blue links that draw in as you scroll
+const M=60,lp=new Float32Array(M*6),lc=new Float32Array(M*6),np=new Float32Array(M*6),nc=new Float32Array(M*6);
+for(let i=0;i<M;i++){const a=R()*Math.PI*2,r=10+Math.pow(R(),.7)*60,y=(R()-.5)*14;const A=[Math.cos(a)*r,y,Math.sin(a)*r];
+  const b=a+(R()-.5)*.5,r2=r+(R()-.5)*18;const B=[Math.cos(b)*r2,y+(R()-.5)*8,Math.sin(b)*r2];
+  lp.set([...A,...B],i*6);lc.set([gold.r,gold.g,gold.b,blue.r,blue.g,blue.b],i*6);np.set([...A,...B],i*6);nc.set([gold.r,gold.g,gold.b,blue.r,blue.g,blue.b],i*6);}
+const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(lp,3));lg.setAttribute('color',new THREE.BufferAttribute(lc,3));
+const lm=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending});scene.add(new THREE.LineSegments(lg,lm));
+const ng=new THREE.BufferGeometry();ng.setAttribute('position',new THREE.BufferAttribute(np,3));ng.setAttribute('color',new THREE.BufferAttribute(nc,3));
+const nm=new THREE.PointsMaterial({size:3.2,map:tex,transparent:true,depthWrite:false,vertexColors:true,opacity:0,blending:THREE.AdditiveBlending});scene.add(new THREE.Points(ng,nm));
+function sprite(col,s){const m=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,color:col,blending:THREE.AdditiveBlending});const sp=new THREE.Sprite(m);sp.scale.set(s,s,1);scene.add(sp);return sp;}
+const sA=sprite(gold,18),sB=sprite(new THREE.Color('#9CC4FF'),20),bHalo=sprite(new THREE.Color('#5A8FFF'),52),core=sprite(gold,46);
+let mx=0,my=0;if(!reduce)addEventListener('pointermove',e=>{mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5},{passive:true});
+// camera path keyed to page progress
+const K=[[0,330,-1.0,.62],[.12,180,-.7,.95],[.28,110,-.2,1.12],[.42,70,.4,1.2],[.6,150,1.4,.85],[.78,240,2.4,.7],[1,380,3.4,.95]];
+const cur={r:600,th:-1.2,ph:.5};
+function sample(t){for(let i=0;i<K.length-1;i++){const a=K[i],b=K[i+1];if(t<=b[0]){const u=smooth(clamp((t-a[0])/(b[0]-a[0]),0,1));return[Math.exp(lerp(Math.log(a[1]),Math.log(b[1]),u)),lerp(a[2],b[2],u),lerp(a[3],b[3],u)];}}const z=K[K.length-1];return[z[1],z[2],z[3]];}
+function frame(t){
+  const max=document.documentElement.scrollHeight-innerHeight,pr=clamp(scrollY/(max||1),0,1),k=reduce?1:.06;
+  const [r,th,ph]=sample(pr);cur.r+=(r-cur.r)*k;cur.th+=(th-cur.th)*k;cur.ph+=(ph-cur.ph)*k;
+  const T=cur.th+mx*.15+(reduce?0:t*.00002),P=cur.ph+my*.08;
+  camera.position.set(cur.r*Math.sin(P)*Math.cos(T),cur.r*Math.cos(P),cur.r*Math.sin(P)*Math.sin(T));camera.lookAt(0,0,0);
+  const off=innerWidth>900?.18:0;camera.setViewOffset(innerWidth,innerHeight,-innerWidth*off*Math.sin(pr*Math.PI*2),0,innerWidth,innerHeight);
+  const hp=smooth(clamp(scrollY/(innerHeight*.9),0,1)),sep=lerp(.6,9,hp),fl=reduce?0:Math.sin(t*.001)*.6;
+  sA.position.set(-sep,fl,0);sB.position.set(sep*1.15,-fl*.6,0);bHalo.position.copy(sB.position);
+  const fade=1;sA.material.opacity=sB.material.opacity=fade;bHalo.material.opacity=.75*hp;core.material.opacity=.45+.35*hp;
+  const lv=smooth(clamp((pr-.16)/.22,0,1))*(1-smooth(clamp((pr-.62)/.2,0,1)));
+  lm.opacity=lv*.6;nm.opacity=lv*.9;lg.setDrawRange(0,Math.floor(M*lv)*2);
+  galaxy.rotation.y=reduce?0:t*.00001;
+  renderer.render(scene,camera);requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+})();
+</script>
